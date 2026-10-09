@@ -1,0 +1,7 @@
+/target/
+/.venv/
+/models/
+/out/
+/verification-local/
+__pycache__/
+*.onnx
