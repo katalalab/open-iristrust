@@ -59,6 +59,8 @@ assert_eq!(comparison.distance, 0.0);
 
 Embedding applications can implement the `Segmenter` trait, supply `GeometryMasks`, or provide validated circle/ellipse `Geometry`. `extract_from_masks` and `extract_with_geometry` require no ONNX feature. `encode` handles externally normalized images and optional validity masks. `config` prints all default pipeline settings; `extract --config path.json` applies an edited configuration. JSON rasters contain `width`, `height` and row-major `data`; see the public Rust types and `docs/design.md`.
 
+Library callers must validate deserialized or manually constructed `Raster` values before using them as images. `Raster::get` returns `None` when coordinates are out of range or their index would overflow; it does not replace full raster validation.
+
 ## Template and scoring contract
 
 - Format: `iristrust-v1`, with eye side, encoding profile, and code/mask planes containing two phase bits per sample. Bits are packed little-endian within `u64` words.

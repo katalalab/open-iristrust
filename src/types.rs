@@ -36,9 +36,13 @@ impl<T> Raster<T> {
         }
         Ok(())
     }
+    /// Returns `None` for coordinates outside the raster or for an overflowing index.
+    /// Call `validate` separately when accepting an untrusted raster.
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
         if x < self.width && y < self.height {
-            self.data.get(y * self.width + x)
+            y.checked_mul(self.width)
+                .and_then(|offset| offset.checked_add(x))
+                .and_then(|index| self.data.get(index))
         } else {
             None
         }

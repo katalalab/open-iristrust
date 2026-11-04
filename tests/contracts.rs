@@ -5,6 +5,21 @@ use iristrust::{
 };
 
 #[test]
+fn raster_get_does_not_overflow_or_alias_on_malformed_dimensions() {
+    let raster = Raster {
+        width: usize::MAX / 2 + 2,
+        height: 3,
+        data: vec![10_u8, 20, 30],
+    };
+    assert!(raster.validate().is_err());
+    assert_eq!(raster.get(0, 2), None);
+    assert_eq!(raster.get(raster.width - 1, 1), None);
+    let valid = Raster::new(2, 2, vec![10_u8, 20, 30, 40]).unwrap();
+    assert_eq!(valid.get(1, 1), Some(&40));
+    assert_eq!(valid.get(2, 1), None);
+}
+
+#[test]
 fn crossing_and_misordered_boundaries_are_rejected() {
     let center = Point { x: 20.0, y: 20.0 };
     let mut geometry = geometry_from_circles(center, 2.0, center, 6.0, 8).unwrap();
