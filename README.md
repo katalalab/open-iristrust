@@ -39,6 +39,8 @@ cargo run --release -- aggregate out/eye.json out/eye.json --output out/aggregat
 
 Use the same command on one line in PowerShell; its continuation character is a backtick. Outputs refuse to overwrite existing files. `--threads 4` controls both native workers and ONNX CPU inference. `--denoise` enables bilateral model preprocessing; it is disabled by default for throughput. Infrared eye imagery is the intended input.
 
+Multi-file output is staged before publication, but publishing several paths is not atomic. If a later publication fails, earlier published paths are left in place: the CLI exits nonzero and reports the count without printing the paths. Inspect the chosen output location before retrying; do not assume a named path still refers to this execution's file. A process crash or a failure during temporary-file cleanup can also leave artifacts. Use a private output directory to limit interference with staging files.
+
 ## Library
 
 ```rust,no_run
@@ -60,6 +62,8 @@ assert_eq!(comparison.distance, 0.0);
 Embedding applications can implement the `Segmenter` trait, supply `GeometryMasks`, or provide validated circle/ellipse `Geometry`. `extract_from_masks` and `extract_with_geometry` require no ONNX feature. `encode` handles externally normalized images and optional validity masks. `config` prints all default pipeline settings; `extract --config path.json` applies an edited configuration. JSON rasters contain `width`, `height` and row-major `data`; see the public Rust types and `docs/design.md`.
 
 Library callers must validate deserialized or manually constructed `Raster` values before using them as images. `Raster::get` returns `None` when coordinates are out of range or their index would overflow; it does not replace full raster validation.
+
+`OutputTransaction::commit` returns `Error::PartialPublish` after at least one successful publication followed by a failure. Its `published_paths()` are historical successful target names, not proof of current contents or ownership; `cause()` exposes the underlying I/O error. A failure of the first `persist_noclobber` remains `Error::Io`; an unstaged transaction remains `Error::InvalidInput`. Default `Display` and `Debug` for `PartialPublish` omit paths and the cause text, but callers that inspect or log the error chain or `cause()` may expose sensitive details. The new `Error` variant and the change from rollback to retained partial output are compatibility changes: downstream exhaustive matches and cleanup logic must be updated.
 
 ## Template and scoring contract
 
