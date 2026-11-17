@@ -208,14 +208,18 @@ impl CodePlane {
         }
         Ok(())
     }
-    /// Checked phase access; component 0 is real, 1 imaginary.
-    pub fn get_bit(&self, row: usize, col: usize, component: usize, mask: bool) -> Result<bool> {
+    fn check_bit_coordinates(&self, row: usize, col: usize, component: usize) -> Result<()> {
         self.validate()?;
         if row >= self.rows || col >= self.cols || component >= 2 {
             return Err(Error::InvalidInput(
                 "bit coordinates outside code plane".into(),
             ));
         }
+        Ok(())
+    }
+    /// Checked phase access; component 0 is real, 1 imaginary.
+    pub fn get_bit(&self, row: usize, col: usize, component: usize, mask: bool) -> Result<bool> {
+        self.check_bit_coordinates(row, col, component)?;
         Ok(self.bit(row, col, component, mask))
     }
     pub fn put_bit(
@@ -226,12 +230,7 @@ impl CodePlane {
         mask: bool,
         value: bool,
     ) -> Result<()> {
-        self.validate()?;
-        if row >= self.rows || col >= self.cols || component >= 2 {
-            return Err(Error::InvalidInput(
-                "bit coordinates outside code plane".into(),
-            ));
-        }
+        self.check_bit_coordinates(row, col, component)?;
         self.set_bit(row, col, component, mask, value);
         Ok(())
     }

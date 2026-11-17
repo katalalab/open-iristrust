@@ -155,9 +155,7 @@ pub fn postprocess(
         .checked_mul(height)
         .filter(|&n| n > 0 && n <= MAX_PIXELS)
         .ok_or_else(|| Error::InvalidInput("invalid output dimensions".into()))?;
-    if width == 0
-        || height == 0
-        || values.len() != n * 4
+    if values.len() != n * 4
         || values
             .iter()
             .any(|&v| !v.is_finite() || !(0.0..=1.0).contains(&v))
