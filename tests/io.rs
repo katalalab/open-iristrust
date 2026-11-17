@@ -63,3 +63,42 @@ fn failed_image_encoding_leaves_no_output_or_staged_json() {
     assert!(save_image(&image, &grayscale).is_err());
     assert!(!image.exists());
 }
+
+fn directory_entries(dir: &std::path::Path) -> Vec<std::ffi::OsString> {
+    let mut names = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<Vec<_>>();
+    names.sort();
+    names
+}
+
+#[test]
+fn commit_with_unstaged_output_publishes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first.json");
+    let second = dir.path().join("second.json");
+    let mut transaction = OutputTransaction::new([first.as_path(), second.as_path()]).unwrap();
+    transaction.stage_json(&first, &1).unwrap();
+
+    assert!(transaction.commit().is_err());
+    assert!(directory_entries(dir.path()).is_empty());
+}
+
+#[test]
+fn failed_publish_rolls_back_earlier_outputs_and_staged_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first.json");
+    let second = dir.path().join("second.json");
+    let third = dir.path().join("third.json");
+    let mut transaction =
+        OutputTransaction::new([first.as_path(), second.as_path(), third.as_path()]).unwrap();
+    for path in [&first, &second, &third] {
+        transaction.stage_json(path, &1).unwrap();
+    }
+    std::fs::write(&second, b"created concurrently").unwrap();
+
+    assert!(transaction.commit().is_err());
+    assert_eq!(directory_entries(dir.path()), vec!["second.json"]);
+    assert_eq!(std::fs::read(&second).unwrap(), b"created concurrently");
+}
