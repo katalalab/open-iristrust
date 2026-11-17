@@ -164,9 +164,7 @@ impl IrisPipeline {
             .planes
             .iter()
             .map(|p| p.bit_len())
-            .collect::<Result<Vec<_>>>()?
-            .iter()
-            .sum();
+            .sum::<Result<usize>>()?;
         let report = ExtractionReport {
             quality,
             valid_bits: template.valid_bits(),
