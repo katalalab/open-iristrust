@@ -125,32 +125,26 @@ impl OutputTransaction {
         })
     }
 
-    pub fn commit(mut self) -> Result<()> {
-        if self.entries.iter().any(|entry| entry.staged.is_none()) {
-            return Err(Error::InvalidInput(
-                "every output must be staged before commit".into(),
-            ));
-        }
-        let mut published = Vec::with_capacity(self.entries.len());
-        for entry in &mut self.entries {
-            let Some(staged) = entry.staged.take() else {
+    pub fn commit(self) -> Result<()> {
+        // Nothing is published unless every output was staged.
+        let staged = self
+            .entries
+            .into_iter()
+            .map(|entry| entry.staged.map(|file| (entry.target, file)))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| {
+                Error::InvalidInput("every output must be staged before commit".into())
+            })?;
+        let mut published = Vec::with_capacity(staged.len());
+        for (target, file) in staged {
+            // On failure, dropping `error.file` and the remaining entries removes their temporary files.
+            if let Err(error) = file.persist_noclobber(&target) {
                 for target in published {
                     let _ = fs::remove_file(target);
                 }
-                return Err(Error::InvalidInput(
-                    "every output must be staged before commit".into(),
-                ));
-            };
-            match staged.persist_noclobber(&entry.target) {
-                Ok(_) => published.push(entry.target.clone()),
-                Err(error) => {
-                    entry.staged = Some(error.file);
-                    for target in published {
-                        let _ = fs::remove_file(target);
-                    }
-                    return Err(error.error.into());
-                }
+                return Err(error.error.into());
             }
+            published.push(target);
         }
         Ok(())
     }
