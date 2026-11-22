@@ -54,16 +54,21 @@ impl GaborKernel {
         let half_height = (config.kernel_height / 2) as isize;
         let theta = config.theta_degrees.to_radians();
         let (sin_theta, cos_theta) = theta.sin_cos();
+        // Rotated carrier coordinate and Gaussian log-envelope at a kernel offset.
+        let envelope_at = |row: isize, col: isize| {
+            let x = row as f64;
+            let y = col as f64;
+            let rotated_x = x * cos_theta + y * sin_theta;
+            let rotated_y = -x * sin_theta + y * cos_theta;
+            let envelope = -(rotated_x.powi(2) / config.sigma_phi.powi(2)
+                + rotated_y.powi(2) / config.sigma_rho.powi(2))
+                / 2.0;
+            (rotated_x, envelope)
+        };
 
         for row in -half_height..=half_height {
             for col in -half_width..=half_width {
-                let x = row as f64;
-                let y = col as f64;
-                let rotated_x = x * cos_theta + y * sin_theta;
-                let rotated_y = -x * sin_theta + y * cos_theta;
-                let envelope = -(rotated_x.powi(2) / config.sigma_phi.powi(2)
-                    + rotated_y.powi(2) / config.sigma_rho.powi(2))
-                    / 2.0;
+                let (rotated_x, envelope) = envelope_at(row, col);
                 let amplitude = envelope.exp()
                     / (2.0 * std::f64::consts::PI * config.sigma_phi * config.sigma_rho);
                 let carrier = 2.0 * std::f64::consts::PI * rotated_x / config.wavelength;
@@ -76,18 +81,10 @@ impl GaborKernel {
             for row in 0..config.kernel_height {
                 let start = row * config.kernel_width;
                 let end = start + config.kernel_width;
+                let kernel_row = row as isize - half_height;
                 let g_mean = real[start..end].iter().sum::<f64>() / config.kernel_width as f64;
                 let correction_mean = (-half_width..=half_width)
-                    .map(|col| {
-                        let x = row as isize - half_height;
-                        let y = col as f64;
-                        let x = x as f64;
-                        let rotated_x = x * cos_theta + y * sin_theta;
-                        let rotated_y = -x * sin_theta + y * cos_theta;
-                        -(rotated_x.powi(2) / config.sigma_phi.powi(2)
-                            + rotated_y.powi(2) / config.sigma_rho.powi(2))
-                            / 2.0
-                    })
+                    .map(|col| envelope_at(kernel_row, col).1)
                     .sum::<f64>()
                     / config.kernel_width as f64;
                 if correction_mean == 0.0 || !correction_mean.is_finite() {
@@ -96,15 +93,7 @@ impl GaborKernel {
                     ));
                 }
                 for (offset, value) in real[start..end].iter_mut().enumerate() {
-                    let col = offset as isize - half_width;
-                    let x = row as isize - half_height;
-                    let y = col as f64;
-                    let x = x as f64;
-                    let rotated_x = x * cos_theta + y * sin_theta;
-                    let rotated_y = -x * sin_theta + y * cos_theta;
-                    let envelope = -(rotated_x.powi(2) / config.sigma_phi.powi(2)
-                        + rotated_y.powi(2) / config.sigma_rho.powi(2))
-                        / 2.0;
+                    let (_, envelope) = envelope_at(kernel_row, offset as isize - half_width);
                     *value -= g_mean / correction_mean * envelope;
                 }
             }
